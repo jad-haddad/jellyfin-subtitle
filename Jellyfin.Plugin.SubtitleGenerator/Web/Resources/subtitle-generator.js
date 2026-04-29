@@ -220,21 +220,71 @@
     async function fetchMediaStreams(itemId) {
         try {
             log('Fetching media streams via API for item:', itemId);
-            // Try PlaybackInfo endpoint
-            const url = `/Items/${itemId}/PlaybackInfo`;
-            const response = await fetch(url, {
-                headers: { 'Accept': 'application/json' }
-            });
+            
+            // Try using ApiClient.ajax which handles authentication
+            if (window.ApiClient && window.ApiClient.ajax) {
+                log('Using ApiClient.ajax for authenticated request');
+                const url = window.ApiClient.getUrl(`Items/${itemId}`, {
+                    Fields: 'MediaSources'
+                });
+                
+                try {
+                    const response = await window.ApiClient.ajax({
+                        url: url,
+                        type: 'GET',
+                        dataType: 'json'
+                    });
+                    
+                    log('ApiClient.ajax response:', response);
+                    
+                    // Response might be the item directly or wrapped
+                    const item = response;
+                    if (item.MediaSources && item.MediaSources[0] && item.MediaSources[0].MediaStreams) {
+                        log('Got streams from ApiClient.ajax');
+                        return item.MediaSources[0].MediaStreams;
+                    }
+                    // Try alternative location
+                    if (item.MediaStreams) {
+                        log('Got streams directly from item');
+                        return item.MediaStreams;
+                    }
+                } catch (ajaxError) {
+                    warn('ApiClient.ajax failed:', ajaxError);
+                }
+            }
+            
+            // Fallback: Try raw fetch with authentication token
+            const accessToken = window.ApiClient ? window.ApiClient.accessToken() : null;
+            const url = `/Items/${itemId}`;
+            
+            const headers = {
+                'Accept': 'application/json'
+            };
+            if (accessToken) {
+                headers['X-Emby-Authorization'] = `MediaBrowser Client="Jellyfin Web", Device="Browser", DeviceId="${window.ApiClient.deviceId()}", Version="10.11.0", Token="${accessToken}"`;
+                headers['X-MediaBrowser-Token'] = accessToken;
+                log('Using access token for authentication');
+            } else {
+                warn('No access token available');
+            }
+            
+            const response = await fetch(url, { headers });
 
             if (!response.ok) {
-                warn('PlaybackInfo API failed:', response.status);
+                warn('Items API failed:', response.status);
                 return null;
             }
 
             const data = await response.json();
+            log('Items API response:', data);
+            
             if (data.MediaSources && data.MediaSources[0] && data.MediaSources[0].MediaStreams) {
-                log('Got streams from API');
+                log('Got streams from Items API');
                 return data.MediaSources[0].MediaStreams;
+            }
+            if (data.MediaStreams) {
+                log('Got streams directly from item');
+                return data.MediaStreams;
             }
             return null;
         } catch (e) {
