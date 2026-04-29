@@ -1,0 +1,147 @@
+/* Subtitle Generator Dialog Styles */
+
+.subtitle-generator-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    padding: 1em;
+}
+
+.subtitle-generator-dialog {
+    background: #202020;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    max-width: 500px;
+    width: 100%;
+    color: #fff;
+    font-family: inherit;
+}
+
+.subtitle-generator-dialog h2 {
+    margin: 0;
+    padding: 1em 1.25em;
+    font-size: 1.3em;
+    font-weight: 500;
+    border-bottom: 1px solid #333;
+}
+
+.subtitle-generator-content {
+    padding: 1.25em;
+}
+
+.subtitle-generator-content .inputContainer {
+    margin-bottom: 1em;
+}
+
+.subtitle-generator-content label.inputLabel {
+    display: block;
+    margin-bottom: 0.35em;
+    font-size: 0.9em;
+    color: #ccc;
+}
+
+.subtitle-generator-content select {
+    width: 100%;
+    padding: 0.5em;
+    background: #333;
+    color: #fff;
+    border: 1px solid #444;
+    border-radius: 3px;
+    font-size: 1em;
+}
+
+.subtitle-generator-progress {
+    margin-top: 1em;
+}
+
+.subtitle-generator-progress .progress-container {
+    width: 100%;
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.subtitle-generator-progress .progress-bar {
+    height: 100%;
+    background: #00a4dc;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.subtitle-generator-progress .progress-text {
+    margin-top: 0.5em;
+    font-size: 0.9em;
+    color: #aaa;
+    text-align: center;
+}
+
+.subtitle-generator-error {
+    margin-top: 1em;
+    padding: 0.75em;
+    background: rgba(204, 68, 68, 0.15);
+    border: 1px solid rgba(204, 68, 68, 0.4);
+    border-radius: 3px;
+    color: #ff6b6b;
+    font-size: 0.9em;
+}
+
+.subtitle-generator-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75em;
+    padding: 1em 1.25em;
+    border-top: 1px solid #333;
+}
+
+.subtitle-generator-actions button {
+    padding: 0.5em 1.25em;
+    font-size: 0.95em;
+    cursor: pointer;
+    border-radius: 3px;
+    border: none;
+}
+
+.subtitle-generator-actions .button-cancel {
+    background: transparent;
+    color: #ccc;
+    border: 1px solid #555;
+}
+
+.subtitle-generator-actions .button-cancel:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.subtitle-generator-actions .button-submit {
+    background: #00a4dc;
+    color: #fff;
+}
+
+.subtitle-generator-actions .button-submit:hover {
+    background: #008dc5;
+}
+
+.subtitle-generator-actions .button-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Button injection styling */
+.subtitle-generator-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    margin-left: 0.5em;
+}
+
+.subtitle-generator-btn .material-icons {
+    font-size: 1.2em;
+}

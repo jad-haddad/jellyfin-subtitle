@@ -1,0 +1,19 @@
+{
+  "guid": "d6c7b3a1-4e2f-4a8b-9c5d-8e1f2a3b4c5d",
+  "name": "Subtitle Generator",
+  "description": "Generates subtitles on demand for movies and episodes via an external subtitle generation service.",
+  "overview": "Adds a 'Generate Subtitle' button to detail pages when no subtitles are available. Integrates with a self-hosted subtitle generation service to create .srt files automatically.",
+  "owner": "jellyfin-community",
+  "category": "Metadata",
+  "imageUrl": "",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "changelog": "Initial release",
+      "targetAbi": "10.11.0",
+      "sourceUrl": "https://github.com/YOUR_USER/jellyfin-plugin-subtitle-generator/releases/download/v1.0.0/jellyfin-plugin-subtitle-generator_1.0.0.zip",
+      "checksum": "",
+      "timestamp": "2026-04-29T00:00:00Z"
+    }
+  ]
+}

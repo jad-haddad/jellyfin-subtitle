@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Subtitle Generator Configuration</title>
+</head>
+<body>
+    <div id="SubtitleGeneratorConfigPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="SubtitleGeneratorConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">Subtitle Generator Settings</h2>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="serviceUrl">Service URL</label>
+                        <input is="emby-input" type="text" id="serviceUrl" label="Service URL" />
+                        <div class="fieldDescription">
+                            URL of the subtitle generation service (e.g. http://subtitle-generator)
+                        </div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="maxCharsPerLine">Max Chars Per Line</label>
+                        <input is="emby-input" type="number" id="maxCharsPerLine" label="Max Chars Per Line" min="20" max="200" />
+                        <div class="fieldDescription">
+                            Maximum number of characters per subtitle line (default: 42)
+                        </div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="pollingInterval">Polling Interval (seconds)</label>
+                        <input is="emby-input" type="number" id="pollingInterval" label="Polling Interval (seconds)" min="1" max="60" />
+                        <div class="fieldDescription">
+                            How often to check job status (default: 5)
+                        </div>
+                    </div>
+
+                    <button is="emby-button" type="submit" class="raised button-submit block">
+                        <span>Save</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            var SubtitleGeneratorConfig = { pluginUniqueId: 'd6c7b3a1-4e2f-4a8b-9c5d-8e1f2a3b4c5d' };
+
+            document.querySelector('#SubtitleGeneratorConfigPage')
+                .addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(SubtitleGeneratorConfig.pluginUniqueId).then(function (config) {
+                        document.querySelector('#serviceUrl').value = config.ServiceUrl || 'http://subtitle-generator';
+                        document.querySelector('#maxCharsPerLine').value = config.MaxCharsPerLine || 42;
+                        document.querySelector('#pollingInterval').value = config.PollingIntervalSeconds || 5;
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+            document.querySelector('#SubtitleGeneratorConfigForm')
+                .addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(SubtitleGeneratorConfig.pluginUniqueId).then(function (config) {
+                        config.ServiceUrl = document.querySelector('#serviceUrl').value;
+                        config.MaxCharsPerLine = parseInt(document.querySelector('#maxCharsPerLine').value, 10);
+                        config.PollingIntervalSeconds = parseInt(document.querySelector('#pollingInterval').value, 10);
+
+                        ApiClient.updatePluginConfiguration(SubtitleGeneratorConfig.pluginUniqueId, config)
+                            .then(function (result) {
+                                Dashboard.processPluginConfigurationUpdateResult(result);
+                            });
+                    });
+
+                    return false;
+                });
+        </script>
+    </div>
+</body>
+</html>

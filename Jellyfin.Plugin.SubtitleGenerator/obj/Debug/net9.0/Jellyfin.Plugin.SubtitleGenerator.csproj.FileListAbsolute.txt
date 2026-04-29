@@ -1,0 +1,12 @@
+/workspace/Jellyfin.Plugin.SubtitleGenerator/bin/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.deps.json
+/workspace/Jellyfin.Plugin.SubtitleGenerator/bin/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.dll
+/workspace/Jellyfin.Plugin.SubtitleGenerator/bin/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.pdb
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.csproj.AssemblyReference.cache
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.GeneratedMSBuildEditorConfig.editorconfig
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.AssemblyInfoInputs.cache
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.AssemblyInfo.cs
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.csproj.CoreCompileInputs.cache
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.dll
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/refint/Jellyfin.Plugin.SubtitleGenerator.dll
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/Jellyfin.Plugin.SubtitleGenerator.pdb
+/workspace/Jellyfin.Plugin.SubtitleGenerator/obj/Debug/net9.0/ref/Jellyfin.Plugin.SubtitleGenerator.dll
