@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "1.0.1",
-        "changelog": "Release 1.0.1",
+        "changelog": "Release 1.0.1 - Fixed JS API calls and checksum",
         "targetAbi": "10.11.0",
         "sourceUrl": "https://github.com/jad-haddad/jellyfin-subtitle/releases/download/v1.0.1/jellyfin-plugin-subtitle-generator_1.0.1.zip",
-        "checksum": "e63640c04d72ef04948d202b8defdd1a4ffb3afbeb1249268f5c8df9fc49212f",
-        "timestamp": "2026-04-29T16:26:17Z"
+        "checksum": "8b0aaf37a0e7cc9bbf0c9afa3a42f9e8",
+        "timestamp": "2026-04-29T16:26:16Z"
       }
     ]
   }
