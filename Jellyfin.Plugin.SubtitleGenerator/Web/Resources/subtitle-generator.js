@@ -6,10 +6,11 @@
     const API_BASE = '/SubtitleGenerator';
 
     let dialogOverlay = null;
-    let currentItem = null;
+    let currentItemId = null;
     let currentJobId = null;
     let pollTimer = null;
     let pluginConfig = null;
+    let currentAudioStreams = [];
 
     // --- Dialog HTML ---
     const DIALOG_HTML = `
@@ -81,6 +82,7 @@
         }
 
         const itemId = match[1];
+        currentItemId = itemId;
 
         // Wait for detail page to render
         await waitForElement('.detailPageContent');
@@ -90,23 +92,55 @@
             return;
         }
 
-        currentItem = await fetchItem(itemId);
-        if (!currentItem) {
+        // Try to get media info from the page or API
+        const mediaInfo = await getMediaInfo(itemId);
+        if (!mediaInfo) {
+            console.log('[SubtitleGenerator] No media info available, skipping');
             return;
         }
 
-        const mediaSources = await fetchMediaSources(itemId);
-        if (!mediaSources || mediaSources.length === 0) {
-            return;
-        }
-
-        const primarySource = mediaSources[0];
-        const subtitleCount = (primarySource.MediaStreams || []).filter(function (s) { return s.Type === 'Subtitle'; }).length;
-        const audioStreams = (primarySource.MediaStreams || []).filter(function (s) { return s.Type === 'Audio'; });
+        const subtitleCount = (mediaInfo.MediaStreams || []).filter(function (s) { return s.Type === 'Subtitle'; }).length;
+        const audioStreams = (mediaInfo.MediaStreams || []).filter(function (s) { return s.Type === 'Audio'; });
 
         if (subtitleCount === 0 && audioStreams.length > 0) {
+            currentAudioStreams = audioStreams;
             injectButton(audioStreams);
         }
+    }
+
+    async function getMediaInfo(itemId) {
+        // First try to extract from page
+        const pageInfo = extractMediaInfoFromPage();
+        if (pageInfo && pageInfo.MediaStreams) {
+            return pageInfo;
+        }
+
+        // Fallback: try API call
+        return await fetchMediaSources(itemId);
+    }
+
+    function extractMediaInfoFromPage() {
+        try {
+            // Try to find media info in the global Jellyfin state
+            if (window.ApiClient && window.ApiClient._item) {
+                return window.ApiClient._item;
+            }
+
+            // Look for any exposed item data
+            const scripts = document.querySelectorAll('script');
+            for (const script of scripts) {
+                const text = script.textContent || '';
+                const match = text.match(/MediaStreams["']?\s*:\s*(\[[^\]]+\])/);
+                if (match) {
+                    try {
+                        return { MediaStreams: JSON.parse(match[1]) };
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {
+            console.warn('[SubtitleGenerator] Failed to extract from page:', e);
+        }
+        return null;
     }
 
     function waitForElement(selector) {
@@ -134,27 +168,26 @@
         });
     }
 
-    async function fetchItem(itemId) {
-        try {
-            const res = await window.ApiClient.getItem(window.ApiClient.serverId(), itemId);
-            return res;
-        } catch (e) {
-            console.error('[SubtitleGenerator] Failed to fetch item:', e);
-            return null;
-        }
-    }
-
     async function fetchMediaSources(itemId) {
         try {
-            const res = await window.ApiClient.getItemDownloadUrl(itemId);
-            // Fallback: use ApiClient.ajax to get media sources
-            const url = window.ApiClient.getUrl(`Items/${itemId}/PlaybackInfo`, { UserId: window.ApiClient.getCurrentUserId() });
-            const response = await window.ApiClient.ajax({ url: url, type: 'GET' });
+            // Try using the public items endpoint first
+            const url = `/Items/${itemId}`;
+            const response = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                console.warn('[SubtitleGenerator] Failed to fetch media sources:', response.status);
+                return null;
+            }
+
             const data = await response.json();
-            return data.MediaSources || [];
+            return data;
         } catch (e) {
-            console.error('[SubtitleGenerator] Failed to fetch media sources:', e);
-            return [];
+            console.error('[SubtitleGenerator] Error fetching media sources:', e);
+            return null;
         }
     }
 
@@ -163,6 +196,7 @@
         // Find the subtitle section or a good injection point
         const subtitleSection = findSubtitleSection();
         if (!subtitleSection) {
+            console.warn('[SubtitleGenerator] No injection point found');
             return;
         }
 
@@ -175,12 +209,29 @@
         });
 
         subtitleSection.appendChild(btn);
+        console.log('[SubtitleGenerator] Button injected successfully');
     }
 
     function findSubtitleSection() {
         // Look for subtitle-related elements or fallback to a common content area
-        const selector = '.childrenItemsContainer, .detail-section, .detailsGroup';
-        return document.querySelector(selector) || document.querySelector('.detailPageContent');
+        // Try multiple possible locations
+        const selectors = [
+            '.itemDetailsGroup',      // Detail group container
+            '.detailsGroup',          // Another common class
+            '.detail-section',        // Generic detail section
+            '.childrenItemsContainer', // Container for media info
+            '.itemDetailPage',        // Main detail page container
+            '.detailPageContent'      // Fallback
+        ];
+
+        for (const selector of selectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                return el;
+            }
+        }
+
+        return null;
     }
 
     // --- Dialog ---
@@ -204,6 +255,10 @@
                 uniqueLangs.set(code, name);
             }
         });
+
+        if (uniqueLangs.size === 0) {
+            uniqueLangs.set('und', 'Unknown');
+        }
 
         uniqueLangs.forEach(function (name, code) {
             const opt = document.createElement('option');
@@ -266,7 +321,8 @@
 
     // --- Generation Logic ---
     async function onGenerate() {
-        if (!currentItem) {
+        if (!currentItemId) {
+            showError('No item selected');
             return;
         }
 
@@ -285,7 +341,7 @@
             const res = await fetch(`${API_BASE}/Jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemId: currentItem.Id, language: language })
+                body: JSON.stringify({ itemId: currentItemId, language: language })
             });
 
             if (res.status === 409) {
@@ -370,7 +426,7 @@
     }
 
     async function triggerScan() {
-        if (!currentItem) {
+        if (!currentItemId) {
             return;
         }
 
@@ -378,7 +434,7 @@
             await fetch(`${API_BASE}/Scan`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemId: currentItem.Id })
+                body: JSON.stringify({ itemId: currentItemId })
             });
         } catch (e) {
             console.warn('[SubtitleGenerator] Scan trigger failed:', e);
