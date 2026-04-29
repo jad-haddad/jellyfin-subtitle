@@ -33,7 +33,7 @@ Add this plugin to Jellyfin's **Plugin Repositories** and install/update automat
 2. Go to **Plugins → Repositories → (+) Add Repository**.
 3. Fill in:
    - **Name**: `Subtitle Generator`
-   - **URL**: `https://jad-haddad.github.io/jellyfin-plugin-subtitle-generator/plugins.json`
+   - **URL**: [https://jad-haddad.github.io/jellyfin-plugin-subtitle-generator/plugins.json](https://raw.githubusercontent.com/jad-haddad/jellyfin-subtitle/main/plugins.json)
 4. **Save**.
 5. Go to **Plugins → Catalog**.
 6. Find **Subtitle Generator** in the list and click **Install**.
