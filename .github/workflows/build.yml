@@ -17,6 +17,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -57,14 +60,25 @@ jobs:
           RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${PLUGIN_NAME}_${VERSION}.zip"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           
+          # Generate updated plugins.json
           jq --arg version "$VERSION" \
              --arg url "$RELEASE_URL" \
              --arg ts "$TIMESTAMP" \
              '.[0].versions = [{version: $version, changelog: ("Release " + $version), targetAbi: "10.11.0", sourceUrl: $url, checksum: "", timestamp: $ts}]' \
-             plugins.json > plugins.json.new
-          mv plugins.json.new plugins.json
+             plugins.json > /tmp/plugins.json.new
+          
+          # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add plugins.json
-          git commit -m "Update plugins.json for $GITHUB_REF_NAME"
-          git push
+          
+          # Fetch main branch and checkout
+          git fetch origin main
+          git checkout -B main origin/main
+          
+          # Apply updates to both root and docs/
+          cp /tmp/plugins.json.new plugins.json
+          cp /tmp/plugins.json.new docs/plugins.json
+          
+          git add plugins.json docs/plugins.json
+          git commit -m "Update plugins.json for $GITHUB_REF_NAME" || echo "Nothing to commit"
+          git push origin main
