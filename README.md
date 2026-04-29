@@ -33,9 +33,7 @@ Add this plugin to Jellyfin's **Plugin Repositories** and install/update automat
 2. Go to **Plugins → Repositories → (+) Add Repository**.
 3. Fill in:
    - **Name**: `Subtitle Generator`
-   - **URL**: `https://youruser.github.io/jellyfin-plugin-subtitle-generator/plugins.json`
-     
-     *(Replace `youruser` with your GitHub username. See [Publishing](#publishing) for how to host this.)*
+   - **URL**: `https://jad-haddad.github.io/jellyfin-plugin-subtitle-generator/plugins.json`
 4. **Save**.
 5. Go to **Plugins → Catalog**.
 6. Find **Subtitle Generator** in the list and click **Install**.
@@ -114,18 +112,18 @@ To make the plugin auto-installable, you'll need to host the Jellyfin-compatible
 
 ### GitHub Pages (Free & Simple)
 
-1. Fork or create a repo on GitHub.
+1. Create a repo on GitHub.
 2. In your repo, go to **Settings → Pages**.
 3. Under **Build and deployment**, select:
    - **Source**: Deploy from a branch
    - **Branch**: `main` / `docs` folder (or create a `gh-pages` branch)
 4. Update **`plugins.json`** with your actual release URL:
    ```json
-   "sourceUrl": "https://github.com/YOUR_USER/jellyfin-plugin-subtitle-generator/releases/download/v1.0.0/jellyfin-plugin-subtitle-generator_1.0.0.zip"
+   "sourceUrl": "https://github.com/jad-haddad/jellyfin-plugin-subtitle-generator/releases/download/v1.0.0/jellyfin-plugin-subtitle-generator_1.0.0.zip"
    ```
 5. Push. Your repository file will be at:
    ```
-   https://youruser.github.io/jellyfin-plugin-subtitle-generator/plugins.json
+   https://jad-haddad.github.io/jellyfin-plugin-subtitle-generator/plugins.json
    ```
 
 ### GitHub Actions Auto-Build
