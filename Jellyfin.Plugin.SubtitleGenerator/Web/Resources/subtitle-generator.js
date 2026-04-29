@@ -6,10 +6,23 @@
     const API_BASE = '/SubtitleGenerator';
 
     let dialogOverlay = null;
-    let currentItem = null;
+    let currentItemId = null;
     let currentJobId = null;
     let pollTimer = null;
     let pluginConfig = null;
+    let currentAudioStreams = [];
+
+    // --- Debug Mode ---
+    const DEBUG = true;
+    function log(...args) {
+        if (DEBUG) console.log('[SubtitleGenerator]', ...args);
+    }
+    function warn(...args) {
+        console.warn('[SubtitleGenerator]', ...args);
+    }
+    function error(...args) {
+        console.error('[SubtitleGenerator]', ...args);
+    }
 
     // --- Dialog HTML ---
     const DIALOG_HTML = `
@@ -39,8 +52,11 @@
 
     // --- Initialization ---
     function init() {
+        log('Initializing Subtitle Generator plugin');
         loadConfig();
         observePageChanges();
+        // Also run immediately on current page
+        setTimeout(processCurrentPage, 500);
     }
 
     async function loadConfig() {
@@ -48,19 +64,22 @@
             const res = await fetch(`${API_BASE}/Config`);
             if (res.ok) {
                 pluginConfig = await res.json();
+                log('Config loaded:', pluginConfig);
             }
         } catch (e) {
-            console.warn('[SubtitleGenerator] Failed to load config:', e);
+            warn('Failed to load config:', e);
         }
     }
 
     // --- Page observation ---
     function observePageChanges() {
         let lastPath = location.hash;
+        log('Observing page changes, current hash:', lastPath);
 
         function check() {
             const currentPath = location.hash;
             if (currentPath !== lastPath) {
+                log('Page changed from', lastPath, 'to', currentPath);
                 lastPath = currentPath;
                 setTimeout(processCurrentPage, 500);
             }
@@ -68,45 +87,188 @@
 
         setInterval(check, 300);
 
-        // Also check on initial load
-        setTimeout(processCurrentPage, 1000);
+        // Also listen to hashchange events
+        window.addEventListener('hashchange', function() {
+            log('Hash change event detected');
+            setTimeout(processCurrentPage, 500);
+        });
     }
 
     async function processCurrentPage() {
         const hash = location.hash;
-        const match = hash.match(/\/details\?id=([a-f0-9\-]+)/i);
+        log('Processing page:', hash);
+
+        // Match detail pages - support both formats
+        const match = hash.match(/\/details\?id=([a-f0-9\-]+)/i) || 
+                      hash.match(/[?&]id=([a-f0-9\-]+)/i);
 
         if (!match) {
+            log('Not a detail page, skipping');
             return;
         }
 
         const itemId = match[1];
+        log('Found item ID:', itemId);
+        currentItemId = itemId;
 
         // Wait for detail page to render
-        await waitForElement('.detailPageContent');
+        const content = await waitForElement('.detailPageContent, .itemDetailPage, .itemDetailsGroup');
+        if (!content) {
+            warn('Detail page content not found after waiting');
+            return;
+        }
+        log('Detail page content found');
 
         // Check if button already injected
         if (document.querySelector('.subtitle-generator-btn')) {
+            log('Button already exists, skipping');
             return;
         }
 
-        currentItem = await fetchItem(itemId);
-        if (!currentItem) {
-            return;
+        // Try to get media streams from the page
+        const mediaStreams = extractMediaStreamsFromPage();
+        
+        if (!mediaStreams || mediaStreams.length === 0) {
+            log('No MediaStreams found on page, trying API fallback');
+            // Try API fallback
+            const apiStreams = await fetchMediaStreams(itemId);
+            if (apiStreams && apiStreams.length > 0) {
+                processStreams(apiStreams);
+            } else {
+                warn('Could not get media streams from page or API');
+                // Debug: show what we found on the page
+                debugPageContent();
+            }
+        } else {
+            log('Found MediaStreams on page:', mediaStreams.length, 'streams');
+            processStreams(mediaStreams);
         }
+    }
 
-        const mediaSources = await fetchMediaSources(itemId);
-        if (!mediaSources || mediaSources.length === 0) {
-            return;
-        }
+    function processStreams(streams) {
+        const subtitleStreams = streams.filter(s => s.Type === 'Subtitle' || s.type === 'Subtitle');
+        const audioStreams = streams.filter(s => s.Type === 'Audio' || s.type === 'Audio');
 
-        const primarySource = mediaSources[0];
-        const subtitleCount = (primarySource.MediaStreams || []).filter(function (s) { return s.Type === 'Subtitle'; }).length;
-        const audioStreams = (primarySource.MediaStreams || []).filter(function (s) { return s.Type === 'Audio'; });
+        log('Subtitles:', subtitleStreams.length, 'Audio:', audioStreams.length);
 
-        if (subtitleCount === 0 && audioStreams.length > 0) {
+        // Show button if no subtitles and has audio
+        if (subtitleStreams.length === 0 && audioStreams.length > 0) {
+            log('Conditions met! Injecting button');
+            currentAudioStreams = audioStreams;
             injectButton(audioStreams);
+        } else {
+            log('Conditions not met. Subtitles:', subtitleStreams.length, 'Audio:', audioStreams.length);
         }
+    }
+
+    function extractMediaStreamsFromPage() {
+        // Try multiple methods to find MediaStreams
+        
+        // Method 1: Look in global Jellyfin state
+        if (window.ApiClient && window.ApiClient._currentItem && window.ApiClient._currentItem.MediaStreams) {
+            log('Found streams in ApiClient._currentItem');
+            return window.ApiClient._currentItem.MediaStreams;
+        }
+
+        // Method 2: Look in page data attributes or scripts
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+            const text = script.textContent || '';
+            // Look for MediaStreams in JSON
+            const match = text.match(/MediaStreams["']?\s*:\s*(\[[\s\S]*?\])/);
+            if (match) {
+                try {
+                    const parsed = JSON.parse(match[1]);
+                    log('Found streams in script tag');
+                    return parsed;
+                } catch (e) {}
+            }
+        }
+
+        // Method 3: Look for item data in the DOM
+        const itemDataEl = document.querySelector('[data-itemdata]');
+        if (itemDataEl) {
+            try {
+                const data = JSON.parse(itemDataEl.getAttribute('data-itemdata') || '{}');
+                if (data.MediaStreams) {
+                    log('Found streams in data-itemdata');
+                    return data.MediaStreams;
+                }
+            } catch (e) {}
+        }
+
+        // Method 4: Try to find in React props (hacky but sometimes works)
+        const reactRoot = document.querySelector('#react-root, [data-reactroot]');
+        if (reactRoot) {
+            for (const key in reactRoot) {
+                if (key.startsWith('__reactInternalInstance') || key.startsWith('__reactFiber')) {
+                    const fiber = reactRoot[key];
+                    if (fiber && fiber.memoizedProps && fiber.memoizedProps.item) {
+                        const item = fiber.memoizedProps.item;
+                        if (item.MediaSources && item.MediaSources[0] && item.MediaSources[0].MediaStreams) {
+                            log('Found streams in React props');
+                            return item.MediaSources[0].MediaStreams;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    async function fetchMediaStreams(itemId) {
+        try {
+            log('Fetching media streams via API for item:', itemId);
+            // Try PlaybackInfo endpoint
+            const url = `/Items/${itemId}/PlaybackInfo`;
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!response.ok) {
+                warn('PlaybackInfo API failed:', response.status);
+                return null;
+            }
+
+            const data = await response.json();
+            if (data.MediaSources && data.MediaSources[0] && data.MediaSources[0].MediaStreams) {
+                log('Got streams from API');
+                return data.MediaSources[0].MediaStreams;
+            }
+            return null;
+        } catch (e) {
+            error('Error fetching media streams:', e);
+            return null;
+        }
+    }
+
+    function debugPageContent() {
+        log('=== DEBUG: Page Content ===');
+        
+        // Log all data attributes
+        const elementsWithData = document.querySelectorAll('[data-*]');
+        log('Elements with data attributes:', elementsWithData.length);
+        
+        // Log ApiClient state
+        if (window.ApiClient) {
+            log('ApiClient exists');
+            log('ApiClient._currentItem:', window.ApiClient._currentItem);
+            log('ApiClient.serverId:', window.ApiClient.serverId());
+        } else {
+            warn('ApiClient not found');
+        }
+
+        // Log all script data
+        const scripts = document.querySelectorAll('script');
+        log('Scripts found:', scripts.length);
+        scripts.forEach((script, i) => {
+            if (script.textContent && script.textContent.includes('MediaStream')) {
+                log('Script', i, 'contains MediaStream');
+            }
+        });
+        
+        log('=== END DEBUG ===');
     }
 
     function waitForElement(selector) {
@@ -134,57 +296,83 @@
         });
     }
 
-    async function fetchItem(itemId) {
-        try {
-            const res = await window.ApiClient.getItem(window.ApiClient.serverId(), itemId);
-            return res;
-        } catch (e) {
-            console.error('[SubtitleGenerator] Failed to fetch item:', e);
-            return null;
-        }
-    }
-
-    async function fetchMediaSources(itemId) {
-        try {
-            const res = await window.ApiClient.getItemDownloadUrl(itemId);
-            // Fallback: use ApiClient.ajax to get media sources
-            const url = window.ApiClient.getUrl(`Items/${itemId}/PlaybackInfo`, { UserId: window.ApiClient.getCurrentUserId() });
-            const response = await window.ApiClient.ajax({ url: url, type: 'GET' });
-            const data = await response.json();
-            return data.MediaSources || [];
-        } catch (e) {
-            console.error('[SubtitleGenerator] Failed to fetch media sources:', e);
-            return [];
-        }
-    }
-
     // --- Button Injection ---
     function injectButton(audioStreams) {
-        // Find the subtitle section or a good injection point
+        log('Injecting button with', audioStreams.length, 'audio streams');
+        
         const subtitleSection = findSubtitleSection();
         if (!subtitleSection) {
+            warn('No injection point found!');
+            // Debug: show available elements
+            const possible = document.querySelectorAll('.detailPageContent, .itemDetailsGroup, .detailsGroup, .itemDetailPage, [class*="detail"], [class*="media"]');
+            log('Possible containers found:', possible.length);
+            possible.forEach((el, i) => {
+                log('  ', i, el.className);
+            });
             return;
         }
 
         const btn = document.createElement('button');
         btn.className = 'raised subtitle-generator-btn';
         btn.innerHTML = '<span class="material-icons">closed_caption</span><span>Generate Subtitle</span>';
-        btn.style.marginTop = '0.5em';
+        btn.style.cssText = 'margin-top: 0.5em; display: inline-flex; align-items: center; gap: 0.4em;';
         btn.addEventListener('click', function () {
             openDialog(audioStreams);
         });
 
         subtitleSection.appendChild(btn);
+        log('Button injected successfully!');
     }
 
     function findSubtitleSection() {
-        // Look for subtitle-related elements or fallback to a common content area
-        const selector = '.childrenItemsContainer, .detail-section, .detailsGroup';
-        return document.querySelector(selector) || document.querySelector('.detailPageContent');
+        // Expanded list of possible locations
+        const selectors = [
+            // Specific subtitle areas
+            '.subtitleSection',
+            '.subtitles-section',
+            '[class*="subtitle"]',
+            
+            // General detail areas  
+            '.itemDetailsGroup',
+            '.detailsGroup',
+            '.itemMediaInfo',
+            '.mediaInfo',
+            
+            // Media stream lists
+            '.mediaStreamList',
+            '.streamList',
+            
+            // Detail containers
+            '.detailPageContent',
+            '.itemDetailPage',
+            '.itemDetailContent',
+            '.detailsPageContent',
+            
+            // Fallbacks
+            '.mainDetailButtons',
+            '.detailSection',
+            '[class*="details"]'
+        ];
+
+        for (const selector of selectors) {
+            try {
+                const el = document.querySelector(selector);
+                if (el) {
+                    log('Found injection point:', selector);
+                    return el;
+                }
+            } catch (e) {
+                // Invalid selector, skip
+            }
+        }
+
+        return null;
     }
 
     // --- Dialog ---
     function openDialog(audioStreams) {
+        log('Opening dialog with', audioStreams.length, 'audio streams');
+        
         if (!document.getElementById('sg-dialog-overlay')) {
             const div = document.createElement('div');
             div.innerHTML = DIALOG_HTML;
@@ -198,12 +386,16 @@
 
         const uniqueLangs = new Map();
         audioStreams.forEach(function (stream) {
-            const code = stream.Language || 'und';
-            const name = stream.Language || 'Unknown';
+            const code = stream.Language || stream.language || 'und';
+            const name = stream.Language || stream.language || stream.DisplayTitle || 'Unknown';
             if (!uniqueLangs.has(code)) {
                 uniqueLangs.set(code, name);
             }
         });
+
+        if (uniqueLangs.size === 0) {
+            uniqueLangs.set('und', 'Unknown');
+        }
 
         uniqueLangs.forEach(function (name, code) {
             const opt = document.createElement('option');
@@ -266,7 +458,8 @@
 
     // --- Generation Logic ---
     async function onGenerate() {
-        if (!currentItem) {
+        if (!currentItemId) {
+            showError('No item selected');
             return;
         }
 
@@ -285,7 +478,7 @@
             const res = await fetch(`${API_BASE}/Jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemId: currentItem.Id, language: language })
+                body: JSON.stringify({ itemId: currentItemId, language: language })
             });
 
             if (res.status === 409) {
@@ -308,7 +501,7 @@
             const errorData = await res.json().catch(function () { return { message: 'Unknown error' }; });
             showError(errorData.message || `Request failed (${res.status})`);
         } catch (e) {
-            console.error('[SubtitleGenerator] Submit failed:', e);
+            error('Submit failed:', e);
             showError('Failed to connect to subtitle generation service.');
         }
     }
@@ -354,7 +547,7 @@
 
                 showProgress(`Processing... ${pct}%`, pct);
             } catch (e) {
-                console.error('[SubtitleGenerator] Poll failed:', e);
+                error('Poll failed:', e);
             }
         }
 
@@ -370,7 +563,7 @@
     }
 
     async function triggerScan() {
-        if (!currentItem) {
+        if (!currentItemId) {
             return;
         }
 
@@ -378,17 +571,19 @@
             await fetch(`${API_BASE}/Scan`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemId: currentItem.Id })
+                body: JSON.stringify({ itemId: currentItemId })
             });
         } catch (e) {
-            console.warn('[SubtitleGenerator] Scan trigger failed:', e);
+            warn('Scan trigger failed:', e);
         }
     }
 
     // --- Start ---
-    // Wait for Jellyfin's ApiClient to be ready
+    log('Subtitle Generator script loaded, waiting for ApiClient...');
+    
     function waitForApiClient() {
         if (window.ApiClient && window.ApiClient.serverId) {
+            log('ApiClient ready, starting initialization');
             init();
         } else {
             setTimeout(waitForApiClient, 500);
@@ -396,4 +591,7 @@
     }
 
     waitForApiClient();
+    
+    // Also expose debug function
+    window.SubtitleGeneratorDebug = debugPageContent;
 })();
