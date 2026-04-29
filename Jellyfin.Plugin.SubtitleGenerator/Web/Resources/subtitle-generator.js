@@ -575,10 +575,13 @@
                 }
 
                 const data = await res.json();
-                const status = data.status;
-                const pct = data.progress_pct || 0;
+                // API returns PascalCase, handle both cases
+                const status = data.Status || data.status;
+                const pct = data.ProgressPct || data.progress_pct || 0;
 
-                if (status === 'completed') {
+                log('Job status:', status, 'Progress:', pct + '%');
+
+                if (status === 'completed' || status === 'Completed') {
                     showProgress('Completed! Scanning library...', 100);
                     stopPolling();
                     await triggerScan();
@@ -589,8 +592,8 @@
                     return;
                 }
 
-                if (status === 'failed') {
-                    showError(data.error || 'Subtitle generation failed.');
+                if (status === 'failed' || status === 'Failed') {
+                    showError(data.Error || data.error || 'Subtitle generation failed.');
                     stopPolling();
                     return;
                 }
