@@ -44,6 +44,10 @@ jobs:
           zip -r "../${PLUGIN_NAME}_${VERSION}.zip" .
           cd ..
           ls -la "${PLUGIN_NAME}_${VERSION}.zip"
+          
+          # Compute SHA256 checksum
+          sha256sum "${PLUGIN_NAME}_${VERSION}.zip" | awk '{print $1}' > /tmp/checksum.txt
+          echo "Checksum: $(cat /tmp/checksum.txt)"
 
       - name: Upload release asset
         if: startsWith(github.ref, 'refs/tags/v')
@@ -59,12 +63,14 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${PLUGIN_NAME}_${VERSION}.zip"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          CHECKSUM=$(cat /tmp/checksum.txt)
           
           # Generate updated plugins.json
           jq --arg version "$VERSION" \
              --arg url "$RELEASE_URL" \
              --arg ts "$TIMESTAMP" \
-             '.[0].versions = [{version: $version, changelog: ("Release " + $version), targetAbi: "10.11.0", sourceUrl: $url, checksum: "", timestamp: $ts}]' \
+             --arg checksum "$CHECKSUM" \
+             '.[0].versions = [{version: $version, changelog: ("Release " + $version), targetAbi: "10.11.0", sourceUrl: $url, checksum: $checksum, timestamp: $ts}]' \
              plugins.json > /tmp/plugins.json.new
           
           # Configure git
